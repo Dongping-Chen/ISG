@@ -397,7 +397,7 @@ import os
 
 
 def get_prompt():
-  with open("task_few_shot.json", "r", encoding="utf-8") as f:
+  with open("./ISG_eval/task_few_shot.json", "r", encoding="utf-8") as f:
     data = json.load(f)
   prompt_dict = {
     "extract_sequence": _EXTRACT_SEQUENCE_PROMPT,

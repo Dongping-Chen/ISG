@@ -46,10 +46,6 @@ def load_data(input_file, gt_file):
         gt_data = [json.loads(line) for line in file.readlines()]
     return input_data, gt_data
 
-def initialize_model(model_name):
-    if model_name == "gpt-4o":
-        return VQA_GPT4O()
-
 def evaluate_structure(item):
     answer_structure = ['<text>' if i['type'] == 'text' else '<image>' for i in item['output']]
     correct_structure = ['<text>' if i['type'] == 'text' else '<image>' for i in item['Golden']]
@@ -194,11 +190,12 @@ def evaluate_image(gt_item, renamed_dict, judge_prompt, requirements, vqa_model)
         
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--model", type=str, default="gpt-4o")
+    parser.add_argument("--model", type=str, default="openai/gpt-4.1")
     parser.add_argument("--input_file", type=str, default=None)
     parser.add_argument("--GT_file", type=str, default="./ISG_eval/ISG-Bench.jsonl")
     parser.add_argument("--output_file", type=str, default="auto")
     parser.add_argument("--root", type=str, default="./ISG_eval/")
+    parser.add_argument("--requirements", type=str, default="Score", choices=["Score", "Yes_No"])
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--end", type=int, default=-1)
     args = parser.parse_args()
@@ -208,7 +205,7 @@ def main():
     if args.output_file == "auto":
         args.output_file = args.input_file.replace(".jsonl", f"_{args.start}_{args.end}_judge.jsonl")
     
-    vqa_model = initialize_model(args.model)
+    vqa_model = VQA_Model(args.model)
     
     requirements = {
         "Score": judge_prompt['Requirement']["Score"],
@@ -216,33 +213,48 @@ def main():
     }
     
     def process_item(item, gt_data, args, judge_prompt, requirements, vqa_model):
-        result_dict = {}
-        id = item['id']
-        gt_item = next(i for i in gt_data if i['id'] == id)
-        
-        if 'output' not in item:
+        try:
+            result_dict = {}
+            id = item['id']
+            gt_item = next(i for i in gt_data if i['id'] == id)
+            
+            if 'output' not in item:
+                return item
+            
+            if item['output'] is None:
+                return item
+            
+            for i in item['Query']:
+                if i['type'] == 'image':
+                    if not os.path.isabs(i['content']):
+                        i['content'] = os.path.join(args.root, i['content'])
+            
+            for i in item['Golden']:
+                if i['type'] == 'image':
+                    if not os.path.isabs(i['content']):
+                        i['content'] = os.path.join(args.root, i['content'])
+            
+            for i in item['output']:
+                if i['type'] == 'image':
+                    if not os.path.isabs(i['content']):
+                        i['content'] = os.path.join(args.root, i['content'])
+            
+            result_dict['structure'] = evaluate_structure(item)
+            
+            if result_dict['structure']:
+                renamed_dict = rename_content(item)
+                result_dict['image'] = evaluate_image(gt_item, renamed_dict, judge_prompt, requirements, vqa_model)
+                result_dict['block'] = evaluate_block(gt_item, renamed_dict, judge_prompt, requirements, vqa_model)
+            
+            result_dict['holistic'] = evaluate_response(item, judge_prompt, vqa_model, with_gt=True)
+            # result_dict['general_judge_WO_GT'] = evaluate_response(item, judge_prompt, vqa_model, with_gt=False)
+            
+            item['result'] = result_dict
             return item
-        
-        if item['output'] is None:
+        except Exception as e:
+            print(f"Error processing item {item.get('id', 'unknown')}: {str(e)}")
+            item['result'] = {"error": str(e)}
             return item
-        
-        for i in item['output']:
-            if i['type'] == 'image':
-                if not os.path.isabs(i['content']):
-                    i['content'] = os.path.join("args.root", i['content'])
-        
-        result_dict['structure'] = evaluate_structure(item)
-        
-        if result_dict['structure']:
-            renamed_dict = rename_content(item)
-            result_dict['image'] = evaluate_image(gt_item, renamed_dict, judge_prompt, requirements, vqa_model)
-            result_dict['block'] = evaluate_block(gt_item, renamed_dict, judge_prompt, requirements, vqa_model)
-        
-        result_dict['holistic'] = evaluate_response(item, judge_prompt, vqa_model, with_gt=True)
-        # result_dict['general_judge_WO_GT'] = evaluate_response(item, judge_prompt, vqa_model, with_gt=False)
-        
-        item['result'] = result_dict
-        return item
 
 
     process_item_partial = partial(process_item, gt_data=gt_data, args=args, judge_prompt=judge_prompt, 

@@ -1,0 +1,11 @@
+api_key: "" # input your api key here
+base_url: "https://openrouter.ai/api/v1" # if you want to use local model, please modify here
+
+model_name: "" # input your model name here
+temperature: 0
+
+site_url: "" # input your site url here
+site_name: "" # input your site name here
+
+max_retries: 3
+retry_delay: 2

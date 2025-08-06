@@ -5,7 +5,7 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser(description='Analyze data from input file')
     parser.add_argument('--input_file', type=str, required=True)
-    parser.add_argument('--GT_file', type=str, required=True, default="./ISG-Bench.jsonl")
+    parser.add_argument('--GT_file', type=str, required=False, default="./ISG_eval/ISG-Bench.jsonl")
     return parser.parse_args()
 
 # Read input file

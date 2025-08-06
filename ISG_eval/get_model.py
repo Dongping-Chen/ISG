@@ -10,27 +10,35 @@ from diffusers import (
 import re
 import os
 import json
-import anthropic
 import base64
-import imghdr
 import io
 from PIL import Image
 from .utils import local_image_to_data_url, modify_content
-import google.generativeai as genai
 import gc
-
-# API Keys
-openai_api = os.environ.get("OPENAI_API_KEY")
-claude_api = os.environ.get("ANTHROPIC_API_KEY")
-gemini_api = os.environ.get("GEMINI_API_KEY")
+import yaml
 
 
 class LLM_SD:
-    def __init__(self, text_generator, image_generator):
-        self.text_generator = text_generator
+    def __init__(self, text_generator=None, image_generator=None, config_path="./ISG_eval/config.yaml"):
+        """
+        Unified LLM + Image Generation model class that supports calling various text models through OpenRouter
+        
+        Args:
+            text_generator: Name of text generation model, if None uses default model from config
+            image_generator: Name of image generation model (sd3, sd2.1, flux)
+            config_path: Path to config file
+        """
+        # Load config
+        with open(config_path, "r") as f:
+            self.config = yaml.load(f, Loader=yaml.FullLoader)
+        
+        # Set text generation model
+        self.text_generator = text_generator if text_generator is not None else self.config["model_name"]
         self.image_generator = image_generator
         
-        # Initialize image generation pipeline
+        print(f"Initialized LLM_SD with text model: {self.text_generator}, image model: {image_generator}")
+        
+        # Initialize image generation pipeline if specified
         if image_generator == "sd3":
             self.pipe = StableDiffusion3Pipeline.from_pretrained(
                 "stabilityai/stable-diffusion-3-medium-diffusers",
@@ -49,8 +57,23 @@ class LLM_SD:
                 "black-forest-labs/FLUX.1-dev",
                 torch_dtype=torch.bfloat16
             ).to("cuda")
+        else:
+            self.pipe = None
 
     def generate_image(self, prompt):
+        """
+        Method for generating images
+        
+        Args:
+            prompt: Image generation prompt
+            
+        Returns:
+            Generated PIL Image object, or None if no image generator
+        """
+        if self.pipe is None:
+            print(f"No image generator specified, cannot generate image for: {prompt}")
+            return None
+            
         if self.image_generator == "sd3":
             image = self.pipe(
                 prompt,
@@ -70,152 +93,111 @@ class LLM_SD:
                 max_sequence_length=512,
                 generator=torch.Generator("cuda").manual_seed(0)
             ).images[0]
+        else:
+            print(f"Unknown image generator: {self.image_generator}")
+            return None
         
         gc.collect()
         torch.cuda.empty_cache()
         return image
 
-    def get_res(self, content, image:bool = True):   
-        print(content)
+    def get_res(self, content, image: bool = True, max_retries=None, retry_delay=None):
+        """
+        Unified text generation method using OpenRouter API to call various models
         
-        # GPT-4 Vision
-        if self.text_generator in ["gpt-4o", "gpt4o-mini"]:
-            return self._handle_gpt4_vision(content)
-            
-        # Claude
-        elif self.text_generator == "claude-3.5-sonnet":
-            return self._handle_claude(content, image)
-            
-        # Gemini
-        elif self.text_generator == "gemini":
-            return self._handle_gemini(content, image)
-
-    def _handle_gpt4_vision(self, content):
-        # Process images for GPT-4 Vision
-        for item in content:
-            if item["type"] == "image":
-                item["image_url"] = {"url": local_image_to_data_url(item["content"])}
-                item['type'] = 'image_url'
-                item.pop("content")
+        Args:
+            content: Input content list
+            image: Whether to include images
+            max_retries: Maximum number of retries
+            retry_delay: Delay between retries
+        """
+        print(f"Processing content with model: {self.text_generator}")
         
-        client = OpenAI(api_key=openai_api)
-        success = False
-        attempt = 0
+        # Process content format, convert to OpenAI format
+        processed_content = self._process_content_for_openrouter(content, image)
         
-        while not success and attempt < 3:
+        max_retries = max_retries or self.config["max_retries"]
+        retry_delay = retry_delay or self.config["retry_delay"]
+        
+        retries = 0
+        while retries < max_retries:
             try:
-                chat_completion = client.chat.completions.create(
-                    model='gpt-4o-latest',
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a helpful assistant that can generate images based on the user's instructions. If the task requirement need you to provide the caption of the generated image, please provide it out of <image> and </image>. Notice: please use <image> and </image> to wrap the image caption for the images you want to generate. For example, if you want to generate an image of a cat, you should write <image>a cat</image> in your output. "
-                        },
-                        {"role": "user", "content": content}
-                    ],
+                # Create OpenRouter client
+                client = OpenAI(
+                    base_url=self.config["base_url"],
+                    api_key=self.config["api_key"]
+                )
+                
+                # Build messages
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that can generate images based on the user's instructions. If the task requirement need you to provide the caption of the generated image, please provide it out of <image> and </image>. Notice: please use <image> and </image> to wrap the image caption for the images you want to generate. For example, if you want to generate an image of a cat, you should write <image>a cat</image> in your output."
+                    },
+                    {"role": "user", "content": processed_content}
+                ]
+                
+                # Call API
+                response = client.chat.completions.create(
+                    extra_headers={
+                        "HTTP-Referer": self.config["site_url"],
+                        "X-Title": self.config["site_name"],
+                    },
+                    model=self.text_generator,
+                    messages=messages,
+                    temperature=self.config["temperature"],
                     max_tokens=4096
                 )
-                success = True
-                print(chat_completion)
-                return chat_completion.choices[0].message.content.strip()
+                
+                output = response.choices[0].message.content.strip()
+                print(f"Model response: {output}")
+                return output
                 
             except Exception as e:
-                print(e)
-                attempt += 1
-                time.sleep(10)
+                retries += 1
+                print(f"Connection error (attempt {retries}/{max_retries}): {str(e)}")
+                if retries >= max_retries:
+                    print(f"Failed after {max_retries} attempts")
+                    return None
+                time.sleep(retry_delay)
+        
+        return None
 
-    def _handle_claude(self, content, image):
-        content_list = []
+    def _process_content_for_openrouter(self, content, image: bool = True):
+        """
+        Convert input content to OpenRouter API compatible format
+        
+        Args:
+            content: Original content list
+            image: Whether to include images
+        
+        Returns:
+            Processed content list suitable for OpenRouter API
+        """
+        processed_content = []
         
         for item in content:
             if item["type"] == "image":
                 if image:
-                    content_list.append(self._process_image_for_claude(item["content"]))
+                    # Convert image to data URL format
+                    image_url = local_image_to_data_url(item["content"])
+                    processed_content.append({
+                        "type": "image_url",
+                        "image_url": {"url": image_url}
+                    })
                 else:
-                    content_list.append({
+                    # Replace with text if images not included
+                    processed_content.append({
                         "type": "text",
                         "text": "```Here is an image block, while I can't provide you the real image content. You can assume here is an image here.```"
                     })
             elif item["type"] == "text":
-                content_list.append({
+                processed_content.append({
                     "type": "text",
                     "text": item["content"]
                 })
         
-        print(content_list)
-        client = anthropic.Anthropic(api_key=claude_api)
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20240620",
-            max_tokens=1000,
-            temperature=0.9,
-            system="You are a helpful assistant. Please follow my instructions carefully.",
-            messages=[{"role": "user", "content": content_list}]
-        )
-        
-        print(message.content[0].text)
-        return message.content[0].text
-
-    def _process_image_for_claude(self, image_path):
-        with open(image_path, "rb") as image_file:
-            image_data = image_file.read()
-            
-        file_extension = imghdr.what(None, h=image_data)
-        if file_extension not in ['jpeg', 'jpg', 'png', 'webp']:
-            raise ValueError(f"Unsupported image format: {file_extension}")
-            
-        if file_extension == 'webp':
-            img = Image.open(io.BytesIO(image_data))
-            buffer = io.BytesIO()
-            img.save(buffer, format="PNG")
-            image_data = buffer.getvalue()
-            file_extension = 'png'
-            
-        mime_type = f'image/{file_extension}'
-        img = Image.open(io.BytesIO(image_data))
-        img = img.resize((256, 256), Image.LANCZOS)
-        buffer = io.BytesIO()
-        img.save(buffer, format=file_extension.upper())
-        image_data = buffer.getvalue()
-
-        if len(image_data) > 5 * 1024 * 1024:  # 5MB limit
-            raise ValueError("Image size exceeds 5MB limit")
-            
-        image_data_b64 = base64.b64encode(image_data).decode('utf-8')
-        return {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": mime_type,
-                "data": image_data_b64,
-            }
-        }
-
-    def _handle_gemini(self, content, image):
-        genai.configure(api_key=gemini_api)
-        content_list = []
-        
-        for item in content:
-            if item["type"] == "image":
-                if image:
-                    image = genai.upload_file(path=item["content"])
-                    content_list.append(image)
-                else:
-                    content_list.append("Here is an image block, while I can't provide you the real image content. You can assume here is an image here.")
-            if item["type"] == "text":
-                content_list.append(item["content"])
-        
-        print(content_list)
-        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
-
-        for attempt in range(3):
-            try:
-                response = model.generate_content(content_list)
-                return response.text
-            except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {str(e)}")
-                if attempt == 2:
-                    print("All attempts failed. Skipping this sample.")
-                    return None
+        return processed_content
 
     def get_mm_output(self, content, save_dir, id):
         text_output = self.get_res(content)
@@ -226,7 +208,21 @@ class LLM_SD:
         return self._process_output(text_output, save_dir, id)
         
     def _process_output(self, text_output, save_dir, id):
-        print(text_output)
+        """
+        Process output, extract text and image captions, generate corresponding images
+        
+        Args:
+            text_output: Model output text
+            save_dir: Image save directory
+            id: Sample ID
+            
+        Returns:
+            Processed result list containing text and image parts
+        """
+        if text_output is None:
+            return []
+            
+        print(f"Processing output: {text_output}")
         image_captions = re.findall(r'<image>(.*?)</image>', text_output)
         result = []
         text_parts = re.split(r'<image>.*?</image>', text_output)
@@ -234,17 +230,28 @@ class LLM_SD:
         for i, text in enumerate(text_parts):
             if text.strip():
                 result.append({"type": "text", "content": text.strip()})
+                
             if i < len(image_captions):
                 image_dict = {
                     "type": "image",
                     "caption": image_captions[i]
                 }
+                
+                # Try to generate image
                 image = self.generate_image(image_captions[i])
-                image_filename = f"{id}_g{i+1}.png"
-                image_path = os.path.join(save_dir, image_filename)
-                image.save(image_path)
-                print(f"Image saved to {image_path}")
-                image_dict["content"] = image_path
+                if image is not None:
+                    # Ensure save directory exists
+                    os.makedirs(save_dir, exist_ok=True)
+                    image_filename = f"{id}_g{i+1}.png"
+                    image_path = os.path.join(save_dir, image_filename)
+                    image.save(image_path)
+                    print(f"Image saved to {image_path}")
+                    image_dict["content"] = image_path
+                else:
+                    # Record but continue processing if image generation fails
+                    print(f"Failed to generate image for caption: {image_captions[i]}")
+                    image_dict["content"] = None
+                    
                 result.append(image_dict)
                 
         return result

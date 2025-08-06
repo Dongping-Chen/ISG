@@ -5,11 +5,12 @@ from tqdm import tqdm
 from ISG_eval.get_model import LLM_SD
 import os
 import copy
+from datetime import datetime
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument("--text_generator", type=str, default="claude-3.5-sonnet")
-    parser.add_argument("--image_generator", type=str, default="sd3")
+    parser.add_argument("--text_generator", type=str, required=True, default="claude-3.5-sonnet")
+    parser.add_argument("--image_generator", type=str, required=True, default="sd3")
     parser.add_argument("--input_file", type=str, default="./ISG_eval/ISG-Bench.jsonl")
     parser.add_argument("--output_file", type=str, default="auto")
     parser.add_argument("--save_dir", type=str, default="auto")
@@ -25,10 +26,10 @@ if __name__ == "__main__":
         data = [json.loads(line) for line in f]
 
     if args.output_file == "auto":
-        args.output_file = f"output/{args.text_generator}_{args.image_generator}_{args.start}_{args.end}.jsonl"
+        args.output_file = f"./ISG_eval/output/{args.text_generator}_{args.image_generator}_{args.start}_{args.end}.jsonl"
     os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
     if args.save_dir == "auto":
-        args.save_dir = f"output_images/{args.text_generator}_{args.image_generator}_{args.start}_{args.end}"
+        args.save_dir = f"./ISG_eval/output_images/{args.text_generator.replace('/', '_')}_{args.image_generator}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{args.start}_{args.end}"
     os.makedirs(args.save_dir, exist_ok=True)
     
     model = LLM_SD(args.text_generator, args.image_generator)

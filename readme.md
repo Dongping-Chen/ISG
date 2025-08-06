@@ -17,6 +17,7 @@
 </div>
 
 ## Updates & News
+- [1/27/2025] :star: Our paper is accpeted by ICLR 2025 and selected as Spotlight!
 - [12/09/2024] :star: We release code for compositional framework (Gemini/Claude + SD3/SD2.1/Flux, ISG-Agent) today!
 - [11/27/2024] :page_facing_up: We release our [paper](https://arxiv.org/abs/2411.17188) and [dataset](https://github.com/Dongping-Chen/ISG) today!
   
@@ -38,7 +39,9 @@
 This evaluation method and benchmark is designed for evaluating interleaved generation in four levels: Structural, Block, Image, and Holistic. It is an well established testbed for model can perform both multimodal understanding and generation such as [Show-o](https://github.com/showlab/Show-o) and [Anole](https://github.com/GAIR-NLP/anole).
 
 ### Environment Setup
-Given that we mainly use GPT-4o for VQA in *Image* and *Block* level as well as MLLM-as-a-Judge in *Holistic* level, you can simply setup by: `pip install openai`.
+Currently, we switch to [Openrouter](openrouter.ai) for api calling. Given that we mainly use `openai/gpt-4.1` for VQA in *Image* and *Block* level as well as MLLM-as-a-Judge in *Holistic* level, you can simply setup by: `pip install openai`.
+
+You should also set up your own config in `ISG_eval/config.yaml`. You should input your openrouter api, default model for judging here.
 
 ### Repository Management
 
@@ -64,7 +67,7 @@ Given that we mainly use GPT-4o for VQA in *Image* and *Block* level as well as 
         },
         {
             "type": "image",
-            "content": "images/0000_q1.jpg"
+            "content": "images/0000_q1.png"
         }
     ],
     "Golden": [
@@ -74,19 +77,19 @@ Given that we mainly use GPT-4o for VQA in *Image* and *Block* level as well as 
         },
         {
             "type": "image",
-            "content": "images/0000_g1.jpg"
+            "content": "images/0000_g1.png"
         },
         {
             "type": "image",
-            "content": "images/0000_g2.jpg"
+            "content": "images/0000_g2.png"
         },
         {
             "type": "image",
-            "content": "images/0000_g3.jpg"
+            "content": "images/0000_g3.png"
         },
         {
             "type": "image",
-            "content": "images/0000_g4.jpg"
+            "content": "images/0000_g4.png"
         }
     ],
     "predict": {
@@ -212,10 +215,12 @@ This project is a follow-up of [MLLM-as-a-Judge](https://arxiv.org/pdf/2402.0478
 ## Citation
 
 ```
-@article{chen2024interleaved,
-      title={Interleaved Scene Graph for Interleaved Text-and-Image Generation Assessment}, 
-      author={Dongping Chen and Ruoxi Chen and Shu Pu and Zhaoyi Liu and Yanru Wu and Caixi Chen and Benlin Liu and Yue Huang and Yao Wan and Pan Zhou and Ranjay Krishna},
-      journal={arXiv preprint arXiv:2411.17188}, 
-      year={2024},
+@inproceedings{
+    chen2025interleaved,
+    title={Interleaved Scene Graphs for Interleaved Text-and-Image Generation Assessment},
+    author={Dongping Chen and Ruoxi Chen and Shu Pu and Zhaoyi Liu and Yanru Wu and Caixi Chen and Benlin Liu and Yue Huang and Yao Wan and Pan Zhou and Ranjay Krishna},
+    booktitle={The Thirteenth International Conference on Learning Representations},
+    year={2025},
+    url={https://openreview.net/forum?id=rDLgnYLM5b}
 }
 ```
