@@ -36,7 +36,7 @@
 
 <img src="figures/benchmark.png">
 
-This evaluation method and benchmark is designed for evaluating interleaved generation in four levels: Structural, Block, Image, and Holistic. It is an well established testbed for model can perform both multimodal understanding and generation such as [Show-o](https://github.com/showlab/Show-o) and [Anole](https://github.com/GAIR-NLP/anole).
+This evaluation method and benchmark is designed for evaluating interleaved generation in four levels: Structure, Block, Image, and Holistic. It is an well established testbed for model can perform both multimodal understanding and generation such as [Show-o](https://github.com/showlab/Show-o) and [Anole](https://github.com/GAIR-NLP/anole).
 
 ### Environment Setup
 Currently, we switch to [Openrouter](openrouter.ai) for api calling. Given that we mainly use `openai/gpt-4.1` for VQA in *Image* and *Block* level as well as MLLM-as-a-Judge in *Holistic* level, you can simply setup by: `pip install openai`.
@@ -93,7 +93,7 @@ You should also set up your own config in `ISG_eval/config.yaml`. You should inp
         }
     ],
     "predict": {
-        "structural": {
+        "structure": {
             "Query": [
                 "<query_text1>",
                 "<query_img1>"
@@ -176,7 +176,7 @@ Then, run the following script:
 
 ```shell
 python ISG-eval.py --input_file <your file>
-python summarize_performance.py --input_file <output of ISG-eval.py>
+python calculate_performance.py --input_file <output of ISG-eval.py>
 ```
 
 ## Compositional Framework
@@ -205,7 +205,7 @@ Please See `ISG_agent/README.md` for enviroment setup and how to use. You can al
 |------------|-----------|-------|-------|-------|-------|-------|--------|-------|-------|-------|
 | Block      | ISG-AGENT | 5.515 | 5.391 | 6.181 | 6.081 | 4.243 | 6.408  | 6.816 | 5.678 | 3.321 |
 | Image      | ISG-AGENT | 0.574 | 0.538 | 0.752 | 0.359 | 0.617 | 0.368  | 0.670 | 0.713 | -     |
-| Structural | ISG-AGENT | 0.871 | 0.944 | 0.967 | 0.788 | 0.902 | 0.800  | 1.000 | 0.987 | 0.577 |
+| Structure | ISG-AGENT | 0.871 | 0.944 | 0.967 | 0.788 | 0.902 | 0.800  | 1.000 | 0.987 | 0.577 |
 | Holistic   | ISG-AGENT | 6.262 | 5.873 | 6.459 | 4.887 | 7.582 | 6.932  | 4.540 | 7.030 | 6.795  |
 
 ## Acknowledgments
