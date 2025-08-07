@@ -206,8 +206,8 @@ def local_image_to_data_url(image_path):
     mime_type = mime_type_map.get(file_ext, 'image/jpeg')  # Default to jpeg
     
     # Read and encode the image file
-    if not os.path.exists(image_path):
-        image_path = "./ISG_eval/" + image_path
+    # if not os.path.exists(image_path):
+    #     image_path = "./ISG_eval/" + 
     with open(image_path, "rb") as image_file:
         base64_encoded_data = base64.b64encode(image_file.read()).decode('utf-8')
 

@@ -28,7 +28,7 @@ Sum_category = {
 }
 
 def analyze_data(data):
-    category_statistics = {category: {"structural": 0, "block": [], "image": [], "holistic": [], "total": 0} for category in Sum_category.keys()}
+    category_statistics = {category: {"structure": 0, "block": [], "image": [], "holistic": [], "total": 0} for category in Sum_category.keys()}
     for item in data:
         for category, subcategories in Sum_category.items():
             if item['Category'] in subcategories:
@@ -38,8 +38,8 @@ def analyze_data(data):
                     category_statistics[category]['image'].append(0)
                     category_statistics[category]['holistic'].append(1)
                     continue
-                if item['result'].get('structural'):
-                    category_statistics[category]['structural'] += 1
+                if item['result'].get('structure'):
+                    category_statistics[category]['structure'] += 1
                     
                     if item['result'].get('block'):
                         textimgraph_data = item['result'].get('block', [])
@@ -86,14 +86,14 @@ def analyze_data(data):
     return category_statistics
 
 def print_statistics(category_statistics):
-    print("Category     structural     image     block     holistic")
+    print("Category     structure     image     block     holistic")
     print("-" * 60)
     for category, stats in category_statistics.items():
-        structural = stats['structural'] / stats['total'] if stats['total'] > 0 else 0
+        structure = stats['structure'] / stats['total'] if stats['total'] > 0 else 0
         image = sum(stats['image']) / len(stats['image']) if stats['image'] else 0
         block = sum(stats['block']) / len(stats['block']) if stats['block'] else 0
         holistic = sum(stats['holistic']) / len(stats['holistic']) if stats['holistic'] else 0
-        print(f"{category.replace(' ','_'):<13} {structural:.4f}     {image:.4f}     {block:.4f}     {holistic:.4f}")
+        print(f"{category.replace(' ','_'):<13} {structure:.4f}     {image:.4f}     {block:.4f}     {holistic:.4f}")
 
 def main():
     args = parse_args()
