@@ -226,17 +226,17 @@ def main():
             
             for i in item['Query']:
                 if i['type'] == 'image':
-                    if not os.path.isabs(i['content']):
+                    if not os.path.isabs(i['content']) and not os.path.exists(i['content']):
                         i['content'] = os.path.join(args.root, i['content'])
             
             for i in item['Golden']:
                 if i['type'] == 'image':
-                    if not os.path.isabs(i['content']):
+                    if not os.path.isabs(i['content']) and not os.path.exists(i['content']):
                         i['content'] = os.path.join(args.root, i['content'])
             
             for i in item['output']:
                 if i['type'] == 'image':
-                    if not os.path.isabs(i['content']):
+                    if not os.path.isabs(i['content']) and not os.path.exists(i['content']):
                         i['content'] = os.path.join(args.root, i['content'])
             
             result_dict['structure'] = evaluate_structure(item)

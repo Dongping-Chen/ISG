@@ -392,6 +392,7 @@ task_specific_note = {
   "Partly_Requirement": "You can only output the main and core entities, attributes, and relations that can be 100% sure inferred from the prompt, as shown in the example.",
   "No_Requirement": "You don't need to output anything."
 }
+
 import json
 import os
 
